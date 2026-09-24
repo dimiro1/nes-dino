@@ -49,6 +49,16 @@ local function read_file(path)
     return text
 end
 
+--- Make a path absolute and tidy, so the jar still works from a directory
+--- other than the one this was run from.
+local function absolute(path)
+    if not path then return nil end
+    local dir, file = path:match('^(.*)/([^/]+)$')
+    if not dir then return path end
+    local real = first_line(capture('cd ' .. quote(dir) .. ' && pwd') or '')
+    return real and (real .. '/' .. file) or path
+end
+
 local function remember(jar)
     os.execute('mkdir -p ' .. quote(CACHE))
     local file = io.open(REMEMBERED, 'w')
@@ -163,18 +173,18 @@ function M.jar()
         if not exists(fromenv) then
             error('MYNES is set to ' .. fromenv .. ', which is not there')
         end
-        return fromenv
+        return absolute(fromenv)
     end
 
     local saved = first_line(read_file(REMEMBERED) or '')
     if saved and exists(saved) then return saved end
 
     local found = search()
-    if found then return remember(found) end
+    if found then return remember(absolute(found)) end
 
-    if interactive() then return remember(ask()) end
+    if interactive() then return remember(absolute(ask())) end
     io.stderr:write('MyNES not found; fetching a release (set MYNES to skip this).\n')
-    return remember(download())
+    return remember(absolute(download()))
 end
 
 -- Run as a script rather than required, it prints the path it settled on --
