@@ -6,6 +6,11 @@ The Chrome no-internet dinosaur game, written for the NES.
 
 It is a plain NROM cartridge, so it runs on any NES and on any emulator.
 
+## Download
+
+Grab `dino.nes` from the [releases page](https://github.com/dimiro1/nes-dino/releases)
+and open it in any emulator. Nothing else to install.
+
 ## Playing
 
 | | |
