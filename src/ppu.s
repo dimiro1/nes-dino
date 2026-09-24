@@ -143,32 +143,78 @@ calc_nt_addr:
         lda tmp+2
         rts
 
+; ===========================================================================
+;  Writing along a nametable row
+; ===========================================================================
+;  Both of the routines below go out as runs rather than as a command each
+;  character.  A command costs the flush four times what a byte of data does,
+;  and rubbing out two whole lines one character at a time is more than a
+;  vblank holds -- the tail of it would land while the beam was already
+;  drawing, and leave half a word behind.
+;
+;  A run only ever has to break where the row crosses from one nametable into
+;  the other.  tmp+6 counts the characters already written; queue_row_run
+;  works out how many of the rest fit in one command, leaves that in tmp+7,
+;  and writes the header.  Carry clear when there is nothing left to do.
 ; ---------------------------------------------------------------------------
-;  Queue a string, one character a command, because a run of them can cross
-;  from one nametable into the other.  ptr points at the text; txt_row,
-;  txt_col and txt_len say where it goes and how long it is.
+queue_row_run:
+        lda tmp+6
+        cmp txt_len
+        bcc @more
+        clc
+        rts
+@more:
+        clc
+        adc txt_col
+        clc
+        adc nt_col_base
+        and #$1F                    ; where in this nametable the run starts
+        sta tmp+7
+        lda #32
+        sec
+        sbc tmp+7                   ; ...so this much room before it crosses
+        sta tmp+7
+        lda txt_len
+        sec
+        sbc tmp+6                   ; and this much left to write
+        cmp tmp+7
+        bcc @fits
+        lda tmp+7
+@fits:
+        sta tmp+7
+        sta q_count
+        lda tmp+6
+        clc
+        adc txt_col
+        jsr calc_nt_addr
+        jsr q_cmd
+        sec
+        rts
+
+; ---------------------------------------------------------------------------
+;  Queue a string.  ptr points at the text; txt_row, txt_col and txt_len say
+;  where it goes and how long it is.
 ; ---------------------------------------------------------------------------
 queue_text:
         jsr calc_nt_base
         lda txt_row
         sta tmp+0
-        ldy #0
-@loop:
-        cpy txt_len
-        beq @done
-        tya
-        clc
-        adc txt_col
-        jsr calc_nt_addr
-        sty tmp+4
-        ldy #1
-        sty q_count
-        jsr q_cmd
-        ldy tmp+4
+        lda #0
+        sta tmp+6
+@run:
+        jsr queue_row_run
+        bcc @done
+        lda tmp+7
+        sta tmp+8
+        ldy tmp+6
+@copy:
         lda (ptr),y
         jsr q_push
         iny
-        bne @loop
+        dec tmp+8
+        bne @copy
+        sty tmp+6
+        jmp @run
 @done:
         rts
 
@@ -181,29 +227,28 @@ queue_fill:
         jsr calc_nt_base
         lda txt_row
         sta tmp+0
-        ldy #0
-@loop:
-        cpy txt_len
-        beq @done
-        tya
-        clc
-        adc txt_col
-        jsr calc_nt_addr
-        sty tmp+4
-        ldy #1
-        sty q_count
-        jsr q_cmd
+        lda #0
+        sta tmp+6
+@run:
+        jsr queue_row_run
+        bcc @done
+        ldy tmp+7
+@copy:
         lda tmp+5
         jsr q_push
-        ldy tmp+4
-        iny
-        bne @loop
+        dey
+        bne @copy
+        lda tmp+6
+        clc
+        adc tmp+7
+        sta tmp+6
+        jmp @run
 @done:
         rts
 
 ; ---------------------------------------------------------------------------
 ;  The per-frame queue: a new column of world, the score if it moved, and the
-;  palette if day just turned into night.
+;  palette if day just turned into night or the player just changed scheme.
 ; ---------------------------------------------------------------------------
 queue_frame_work:
         lda col_ready
@@ -227,8 +272,12 @@ queue_frame_work:
         rts
 
 ; ---------------------------------------------------------------------------
-;  The new column of ground, written downwards through rows 21..25.
+;  The new column of world, written downwards through rows 17..25: the range,
+;  the cactus standing in front of it, the ground line and the grit.
 ; ---------------------------------------------------------------------------
+NT0_COLUMN = $2000 + ROW_COL_TOP * 32
+NT1_COLUMN = $2400 + ROW_COL_TOP * 32
+
 queue_column:
         lda col_target
         cmp #32
@@ -236,15 +285,15 @@ queue_column:
         sec
         sbc #32
         clc
-        adc #<($26A0)
+        adc #<NT1_COLUMN
         tax
-        lda #>($26A0)
+        lda #>NT1_COLUMN
         bne @go
 @nt0:
         clc
-        adc #<($22A0)
+        adc #<NT0_COLUMN
         tax
-        lda #>($22A0)
+        lda #>NT0_COLUMN
 @go:
         ldy #COL_ROWS | $80         ; step 32, so this walks down the column
         sty q_count
@@ -311,88 +360,15 @@ queue_score:
         bne @hi
         rts
 
-; ---------------------------------------------------------------------------
-;  Day or night.  Four background colours and four sprite ones; the sprite
-;  set's first entry is a mirror of the backdrop, so writing it changes
-;  nothing and keeps the loop simple.
-; ---------------------------------------------------------------------------
-queue_palette:
-        lda night
-        beq @day
-        lda #<palette_night
-        sta ptr
-        lda #>palette_night
-        sta ptr+1
-        bne @write
-@day:
-        lda #<palette_day
-        sta ptr
-        lda #>palette_day
-        sta ptr+1
-@write:
-        lda #4
-        sta q_count
-        ldx #<($3F00)
-        lda #>($3F00)
-        jsr q_cmd
-        ldy #0
-@bg:
-        lda (ptr),y
-        jsr q_push
-        iny
-        cpy #4
-        bne @bg
-
-        lda #4
-        sta q_count
-        ldx #<($3F10)
-        lda #>($3F10)
-        jsr q_cmd
-        ldy #4
-@spr:
-        lda (ptr),y
-        jsr q_push
-        iny
-        cpy #8
-        bne @spr
-        rts
-
 ; ===========================================================================
 ;  Drawing the first screen, with the beam switched off and all the time in
 ;  the world.  Everything here writes the PPU directly.
 ; ===========================================================================
 ppu_draw_first_screen:
         ; --- palette ---------------------------------------------------
-        bit PPUSTATUS
-        lda #$3F
-        sta PPUADDR
-        lda #$00
-        sta PPUADDR
-        ldx #0
-@pal:
-        lda palette_day,x
-        sta PPUDATA
-        inx
-        cpx #4
-        bne @pal
-        ; the other three background sets and all four sprite sets are the
-        ; same four colours, so nothing on screen can pick a wrong one
-        ldy #7
-@palrest:
-        ldx #0
-@palrest_inner:
-        lda palette_day,x
-        sta PPUDATA
-        inx
-        cpx #4
-        bne @palrest_inner
-        dey
-        bne @palrest
+        jsr pal_write_all
 
         ; --- both nametables and both attribute tables, wiped ----------
-        ; The game is monochrome, so every palette is the same four colours
-        ; and the attribute tables can stay zero for the whole run -- which
-        ; is why no scrolled column ever has to carry attribute bytes with it.
         lda #$20
         sta PPUADDR
         lda #$00
@@ -407,7 +383,18 @@ ppu_draw_first_screen:
         dex
         bne @wipe
 
-        ; --- the ground line, straight across both nametables ----------
+        ; --- which palette each band of the screen gets ----------------
+        ; Written here and never again, even though the world scrolls under
+        ; it: the reason is with attr_bands, and it is why no scrolled column
+        ; ever has to carry attribute bytes with it.
+        lda #>($23C0)
+        ldx #<($23C0)
+        jsr draw_attr_bands
+        lda #>($27C0)
+        ldx #<($27C0)
+        jsr draw_attr_bands
+
+        ; --- the ground, straight across both nametables ---------------
         lda #>($2300)
         ldx #<($2300)
         jsr draw_ground_row
@@ -420,6 +407,28 @@ ppu_draw_first_screen:
         lda #>($2720)
         ldx #<($2720)
         jsr draw_grit_row
+        lda #>($2340)
+        ldx #<($2340)
+        ldy #128
+        jsr draw_solid_run
+        lda #>($2740)
+        ldx #<($2740)
+        ldy #128
+        jsr draw_solid_run
+
+        ; --- the range along the horizon -------------------------------
+        ; Only as far as the first column the scroller will write.  Past
+        ; that the two would be inventing the same ground twice over and
+        ; would not agree about it; and everything past it is written by the
+        ; scroller long before the camera arrives.
+        lda #>NT0_COLUMN
+        ldx #<NT0_COLUMN
+        ldy #32
+        jsr draw_mountain_cols
+        lda #>NT1_COLUMN
+        ldx #<NT1_COLUMN
+        ldy #COL_AHEAD + 1 - 32
+        jsr draw_mountain_cols
 
         ; --- the score bar ---------------------------------------------
         lda #>($2041)
@@ -468,6 +477,78 @@ ppu_draw_first_screen:
         iny
         cpy #11
         bne @prompt
+
+        ; ...and under it the button nobody would otherwise find, followed by
+        ; the name of the scheme it is on.  The name is on the same row and
+        ; immediately after the label, so one address serves for both.
+        lda #>($2000 + ROW_HINT * 32 + COL_HINT)
+        ldx #<($2000 + ROW_HINT * 32 + COL_HINT)
+        jsr ppu_set_addr
+        ldy #0
+@hint:
+        lda txt_select,y
+        sta PPUDATA
+        iny
+        cpy #TXT_SELECT_LEN
+        bne @hint
+        jsr pal_name_point
+        ldy #0
+@name:
+        lda (ptr),y
+        sta PPUDATA
+        iny
+        cpy #SCHEME_NAME
+        bne @name
+        rts
+
+; ---------------------------------------------------------------------------
+;  The range, on the screen that is already there.  Written down the columns
+;  rather than along the rows, because down the columns is the order the
+;  generator makes it in -- and the PPU will step by 32 instead of 1 if it is
+;  asked to.  Rendering is off, so it can be asked directly.
+;  in: A = address hi, X = address lo, Y = how many columns
+; ---------------------------------------------------------------------------
+draw_mountain_cols:
+        sta tmp+8
+        stx tmp+9
+        sty tmp+10
+        lda #$04                    ; step down a column, not along a row
+        sta PPUCTRL
+@col:
+        jsr gen_mountain_column
+        lda tmp+8
+        ldx tmp+9
+        jsr ppu_set_addr
+        ldy #0
+@row:
+        lda col_buf,y
+        sta PPUDATA
+        iny
+        cpy #MTN_ROWS
+        bne @row
+        inc tmp+9                   ; the next column along
+        dec tmp+10
+        bne @col
+        lda #0
+        sta PPUCTRL
+        rts
+
+; ---------------------------------------------------------------------------
+;  Eight attribute bytes to a band, all four quarters of each the same
+; ---------------------------------------------------------------------------
+draw_attr_bands:
+        jsr ppu_set_addr
+        ldy #0
+@band:
+        lda attr_bands,y
+        ldx #8
+@eight:
+        sta PPUDATA
+        dex
+        bne @eight
+        iny
+        cpy #8
+        bne @band
         rts
 
 draw_ground_row:
@@ -499,7 +580,7 @@ draw_grit_row:
         and #$07
         cmp #2
         bcc @some
-        lda #BG_BLANK
+        lda #SOLID_FILL
         bne @put
 @some:
         clc
@@ -507,6 +588,22 @@ draw_grit_row:
 @put:
         sta PPUDATA
         dex
+        bne @loop
+        rts
+
+; ---------------------------------------------------------------------------
+;  A run of solid colour 2: rows 26..29, the four under the grit, which are
+;  the sand.  It never has to scroll -- one flat colour looks the same
+;  wherever it has got to -- and in CLASSIC, where the sand is the sky, it is
+;  not there at all.
+;  in: A = address hi, X = address lo, Y = how many tiles
+; ---------------------------------------------------------------------------
+draw_solid_run:
+        jsr ppu_set_addr
+        lda #SOLID_FILL
+@loop:
+        sta PPUDATA
+        dey
         bne @loop
         rts
 

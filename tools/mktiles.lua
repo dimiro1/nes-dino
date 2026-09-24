@@ -28,13 +28,15 @@ local TILE = 8
 local BANK_TILES = 256
 local PIXELS = { ['.'] = 0, ['o'] = 1, ['#'] = 2, ['*'] = 3 }
 
--- What the four colour indices look like in a preview.  These are the day
--- palette the game actually uses, except colour 3, which is drawn slightly
--- off-white so the sprite-0 marker can be seen at all.
+-- What the four colour indices look like in a preview.  Colour 0 and colour 1
+-- are the CLASSIC scheme the game opens in; colour 2 and colour 3 are both the
+-- backdrop in that scheme and so would be invisible, and are drawn as a sand
+-- and an off-white instead, so the ground band and the sprite-0 marker can be
+-- seen at all.
 local PREVIEW = {
     [0] = { 0xFF, 0xFF, 0xFF },
     [1] = { 0x75, 0x75, 0x75 },
-    [2] = { 0x00, 0x00, 0x00 },
+    [2] = { 0xF0, 0xDF, 0xB8 },
     [3] = { 0xE8, 0xE8, 0xE8 },
 }
 

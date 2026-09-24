@@ -9,6 +9,9 @@ game_init:
         sta rng
         lda #$A3
         sta rng+1
+        lda #0
+        sta pal_scheme              ; CLASSIC, and game_reset leaves it alone:
+                                    ; a scheme outlives the run that chose it
         jsr score_clear_hi
         ; fall through
 
@@ -16,7 +19,8 @@ game_reset:
         jsr score_init              ; hundreds and ptero_on are both read by
         jsr ptero_init              ; the generator, so they go first
         jsr world_init
-        jsr player_init
+        jsr mtn_init                ; the horizon is drawn with the first
+        jsr player_init             ; screen, so it has to be ready first
         jsr clouds_init
         lda #0
         sta night
@@ -117,12 +121,23 @@ do_restart:
         rts
 
 ; ---------------------------------------------------------------------------
+;  Both lines of the title screen: the prompt, and the colour hint under it
+; ---------------------------------------------------------------------------
 queue_clear_prompt:
         lda #12
         sta txt_row
         lda #10
         sta txt_col
         lda #11
+        sta txt_len
+        lda #BG_BLANK
+        jsr queue_fill
+
+        lda #ROW_HINT
+        sta txt_row
+        lda #COL_HINT
+        sta txt_col
+        lda #TXT_SELECT_LEN + SCHEME_NAME
         sta txt_len
         lda #BG_BLANK
         jmp queue_fill
@@ -144,7 +159,7 @@ queue_game_over:
         sta ptr
         lda #>txt_restart_top
         sta ptr+1
-        lda #16
+        lda #15                     ; clear of row 17, where the range starts
         sta txt_row
         lda #15
         sta txt_col
@@ -156,6 +171,6 @@ queue_game_over:
         sta ptr
         lda #>txt_restart_bot
         sta ptr+1
-        lda #17
+        lda #16
         sta txt_row
         jmp queue_text

@@ -11,8 +11,12 @@ SPR0_Y        = 22                 ; OAM y, so the sprite's first line is 23
 
 GROUND_Y      = 192                ; the line everything stands on
 ROW_GROUND    = GROUND_Y / 8       ; 24 -- nametable row holding that line
-ROW_COL_TOP   = ROW_GROUND - 3     ; 21 -- first row a new column rewrites
-COL_ROWS      = 5                  ; rows 21..25: cactus, cactus, cactus, line, grit
+MTN_ROWS      = 7                  ; rows 17..23, as high as a mountain reaches
+ROW_COL_TOP   = ROW_GROUND - MTN_ROWS
+                                   ; 17 -- first row a new column rewrites
+COL_ROWS      = MTN_ROWS + 2       ; 9  -- rows 17..25: the range, then the
+                                   ;       ground line and the grit under it
+COL_CACTUS    = MTN_ROWS - 3       ; 4  -- where a cactus starts in that column
 
 ; --- the dino ---------------------------------------------------------------
 DINO_X        = 24                 ; fixed; the world moves instead
@@ -109,6 +113,31 @@ NIGHT_EVERY    = 1                 ; hundreds between day and night
 PTERO_AFTER    = 3
 NIGHT_EVERY    = 7
 .endif
+
+; --- colour -----------------------------------------------------------------
+;  Three of the four background palettes are spoken for, and three of the four
+;  sprite ones; nothing ever selects the fourth of either.
+PAL_UI        = 0                  ; the score bar and the messages
+PAL_CACTUS    = 1
+PAL_GROUND    = 2                  ; the line, the grit, and the sand under them
+;  The range crosses from the first band into the second on its way down, so
+;  colour 2 of both of them is the mountain colour.  Neither band uses it for
+;  anything else -- lettering and cacti are colour 1 throughout.
+PAL_DINO      = 0                  ; shared with sprite 0, which must stay hidden
+PAL_PTERO     = 1
+PAL_CLOUD     = 2
+
+;  A scheme is nine colours, twice over -- once for the day and once for the
+;  night -- and the game opens in the first of them, which is the browser's
+;  grey on white.  Select walks through the rest.
+NUM_SCHEMES   = 4
+SCHEME_BYTES  = 9                  ; colours in one half of one scheme
+SCHEME_NAME   = 7                  ; characters in its name, padded to fit
+
+;  The title screen's second line: SELECT, two blanks, and the name, centred
+;  under PRESS START on the row above it.
+ROW_HINT      = 14
+COL_HINT      = 8
 
 ; --- PPU setup --------------------------------------------------------------
 ;  Backgrounds live in the first half of the CHR, sprites in the second.

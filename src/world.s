@@ -168,14 +168,13 @@ world_move_obstacles:
         rts
 
 ; ---------------------------------------------------------------------------
-;  Invent one column of world into col_buf: three rows a cactus can stand in,
-;  the ground line itself, and a row of grit under it.
+;  Invent one column of world into col_buf: the horizon and whatever cactus
+;  is standing in front of it, the ground line itself, and a row of grit under
+;  that.  The rows below it are solid sand and never change, so they are drawn
+;  once and left alone.
 ; ---------------------------------------------------------------------------
 gen_column:
-        lda #BG_BLANK
-        sta col_buf+0
-        sta col_buf+1
-        sta col_buf+2
+        jsr gen_mountain_column     ; the range, rows 17..23
 
         jsr rand
         and #$07                    ; six columns in eight are plain line
@@ -189,7 +188,7 @@ gen_column:
 @plain:
         lda #GROUND_A
 @put_ground:
-        sta col_buf+3
+        sta col_buf + MTN_ROWS
 
         jsr rand
         and #$07                    ; grit in one column of eight, no more
@@ -197,11 +196,11 @@ gen_column:
         bcs @no_grit
         clc
         adc #GRIT_A
-        sta col_buf+4
+        sta col_buf + MTN_ROWS + 1
         jmp @obstacle
 @no_grit:
-        lda #BG_BLANK
-        sta col_buf+4
+        lda #SOLID_FILL
+        sta col_buf + MTN_ROWS + 1
 
 @obstacle:
         lda gen_run
@@ -225,8 +224,9 @@ gen_column:
         rts
 
 ; ---------------------------------------------------------------------------
-;  Three tiles of cactus for the column being drawn.  A small one is the same
-;  column however many are bunched together; a large one alternates its two.
+;  Three tiles of cactus for the column being drawn, written over whatever
+;  the range had put in those rows.  A small one is the same column however
+;  many are bunched together; a large one alternates its two.
 ; ---------------------------------------------------------------------------
 emit_obstacle_column:
         lda gen_kind
@@ -236,28 +236,28 @@ emit_obstacle_column:
         bcs @large
 
         lda #CACTUS_SMALL + 0
-        sta col_buf+1
+        sta col_buf + COL_CACTUS + 1
         lda #CACTUS_SMALL + 1
-        sta col_buf+2
+        sta col_buf + COL_CACTUS + 2
         jmp @step
 @large:
         lda gen_step
         and #$01
         bne @right
         lda #CACTUS_LARGE + 0
-        sta col_buf+0
+        sta col_buf + COL_CACTUS + 0
         lda #CACTUS_LARGE + 2
-        sta col_buf+1
+        sta col_buf + COL_CACTUS + 1
         lda #CACTUS_LARGE + 4
-        sta col_buf+2
+        sta col_buf + COL_CACTUS + 2
         jmp @step
 @right:
         lda #CACTUS_LARGE + 1
-        sta col_buf+0
+        sta col_buf + COL_CACTUS + 0
         lda #CACTUS_LARGE + 3
-        sta col_buf+1
+        sta col_buf + COL_CACTUS + 1
         lda #CACTUS_LARGE + 5
-        sta col_buf+2
+        sta col_buf + COL_CACTUS + 2
 @step:
         inc gen_step
         rts

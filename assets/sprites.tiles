@@ -7,6 +7,10 @@
 ;
 ;  The dino is 24x24 standing and 32x16 ducking, which is the same 44x47 to
 ;  59x30 proportion the browser's is.  Its feet sit on y=192.
+;
+;  The dino, the bird and the clouds are each given a palette of their own,
+;  so all three can be different colours while every one of them is still
+;  drawn in a single ink.
 ; ===========================================================================
 
 @bank spr

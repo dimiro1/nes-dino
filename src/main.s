@@ -56,6 +56,11 @@ gen_gap:        .res 1              ; columns of clear ground still to draw
 gen_next:       .res 1              ; what starts when that gap runs out
 gen_kind:       .res 1
 gen_step:       .res 1
+
+mtn_run:        .res 1              ; columns left in the mountain being drawn
+mtn_step:       .res 1              ; which of its columns this one is
+mtn_height:     .res 1              ; rows, and half its width
+mtn_gap:        .res 1              ; columns of clear horizon still to draw
 col_ready:      .res 1
 col_target:     .res 1              ; 0..63, which nametable column is next
 
@@ -82,6 +87,7 @@ hundreds:       .res 1
 flash_timer:    .res 1
 night:          .res 1
 night_count:    .res 1
+pal_scheme:     .res 1              ; 0 is CLASSIC, and nothing but Select moves it
 restart_phase:  .res 1
 pal_dirty:      .res 1
 score_dirty:    .res 1
@@ -108,6 +114,7 @@ blit_x_lo:      .res 1
 blit_x_hi:      .res 1
 blit_y:         .res 1
 blit_tile:      .res 1
+blit_attr:      .res 1              ; which sprite palette the block is drawn in
 blit_w:         .res 1
 blit_h:         .res 1
 
@@ -204,6 +211,7 @@ main:
         sta queue_len
 
         jsr read_pad
+        jsr palette_button
 
         lda restart_phase
         beq @dispatch
@@ -359,7 +367,9 @@ rand:
         rts
 
 .include "ppu.s"
+.include "palette.s"
 .include "world.s"
+.include "mountains.s"
 .include "player.s"
 .include "ptero.s"
 .include "clouds.s"

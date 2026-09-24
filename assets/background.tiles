@@ -1,11 +1,13 @@
 ; ===========================================================================
 ;  background.tiles -- everything the PPU draws behind the sprites
 ; ===========================================================================
-;  Pixels:  .  backdrop (white by day, black by night)
-;           o  the ink colour (grey by day, light grey by night)
-;           #  black
-;           *  the same white as the backdrop -- opaque but invisible, which
-;              is what the sprite-0 split hides behind
+;  Pixels:  .  backdrop -- the sky, whatever colour the scheme has made it
+;           o  the ink: the lettering, a cactus, the ground line and its grit
+;           #  the second ink, which only the ground band uses.  It is the
+;              sand below the line; in CLASSIC it is set to the sky colour,
+;              so the band reads as empty just as the browser's does.
+;           *  the sky again, but opaque -- invisible, and what the sprite-0
+;              split hides behind
 ;
 ;  Art rows must start in column one.  Everything else here is a comment.
 ; ===========================================================================
@@ -411,73 +413,120 @@ ooooo...
 ; ---------------------------------------------------------------------------
 ;  $40-$43  the ground.  The line itself is the top row of the tile, so it
 ;           lands on y=192 exactly, which is where the dino's feet are and
-;           where a cactus sits.  The variants differ only in the grit under
-;           the line; the line is always flat, so a dino never has to follow
-;           the terrain.
+;           where a cactus sits.  Everything under the line is colour 2, the
+;           sand; the variants differ only in the specks sitting on it.  The
+;           line is always flat, so a dino never has to follow the terrain.
 ; ---------------------------------------------------------------------------
 @tile GROUND_A $40
 oooooooo
-........
-........
-........
-........
-........
-........
-........
+########
+########
+########
+########
+########
+########
+########
 
 @tile GROUND_B $41
 oooooooo
-........
-........
-........
-........
-........
-........
-........
+########
+########
+########
+########
+########
+########
+########
 
 @tile GROUND_C $42
 oooooooo
-........
-..o.....
-........
-........
-........
-........
-........
+########
+##o#####
+########
+########
+########
+########
+########
 
 @tile GROUND_D $43
 oooooooo
-.....o..
-........
-........
-........
-........
-........
-........
+#####o##
+########
+########
+########
+########
+########
+########
 
 ; ---------------------------------------------------------------------------
 ;  $44-$45  grit one tile further down, to stop the band under the line
 ;           looking empty
 ; ---------------------------------------------------------------------------
 @tile GRIT_A $44
-........
-...o....
-........
-........
-........
-........
-........
-........
+########
+###o####
+########
+########
+########
+########
+########
+########
 
 @tile GRIT_B $45
-........
-........
-........
-......o.
-........
-........
-........
-........
+########
+########
+########
+######o#
+########
+########
+########
+########
+
+; ---------------------------------------------------------------------------
+;  $46  the body of the ground, which fills every row below the grit.  Solid
+;       colour 2, exactly like the backdrop of the four ground tiles and the
+;       two grit ones -- the whole band below the line is one flat colour
+;       with the line and the specks drawn over it in colour 1.
+; ---------------------------------------------------------------------------
+@tile SOLID_FILL $46
+########
+########
+########
+########
+########
+########
+########
+########
+
+; ---------------------------------------------------------------------------
+;  $47-$48  the two sides of a mountain: one tile of a forty-five degree
+;           line, and its mirror.  A whole range is drawn from nothing but
+;           these, because every slope in it is the same slope, and the two
+;           join up exactly corner to corner however many are laid end to
+;           end.  They are drawn in colour 2, which no other background tile
+;           uses, so the range gets a colour of its own without costing an
+;           attribute byte -- and the triangles are left open, like Super
+;           Mario Land's, so the sky shows through them and the dino and the
+;           cacti simply pass in front.
+; ---------------------------------------------------------------------------
+@tile MTN_LEFT $47
+.......#
+......#.
+.....#..
+....#...
+...#....
+..#.....
+.#......
+#.......
+
+@tile MTN_RIGHT $48
+#.......
+.#......
+..#.....
+...#....
+....#...
+.....#..
+......#.
+.......#
 
 ; ---------------------------------------------------------------------------
 ;  $50-$51  the small cactus: one tile wide, two tall, feet on the line

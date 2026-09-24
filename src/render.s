@@ -4,6 +4,11 @@
 ;  Sprite 0 first, because the split depends on it being slot zero, then the
 ;  dino, the bird and the clouds.  Nothing here ever puts more than seven
 ;  sprites on one scanline, so the hardware never has to drop any.
+;
+;  Each of the three gets a palette of its own, named in blit_attr, which is
+;  how the dino can be one colour while the bird and the clouds are others.
+;  Sprite 0 shares the dino's, whose colour 3 is the backdrop -- which is the
+;  whole reason the marker cannot be seen.
 ; ===========================================================================
 
 .segment "CODE"
@@ -13,7 +18,7 @@ build_oam:
         sta oam+0
         lda #SPR0_MARK
         sta oam+1
-        lda #0
+        lda #PAL_DINO
         sta oam+2
         lda #SPR0_X
         sta oam+3
@@ -89,7 +94,7 @@ draw_block:
         sta oam+0,x
         lda tmp+5
         sta oam+1,x
-        lda #0
+        lda blit_attr
         sta oam+2,x
         lda tmp+2
         sta oam+3,x
@@ -109,6 +114,8 @@ draw_block:
 
 ; ---------------------------------------------------------------------------
 draw_dino:
+        lda #PAL_DINO
+        sta blit_attr
         lda #DINO_X
         sta blit_x_lo
         lda #0
@@ -175,6 +182,8 @@ draw_ptero:
         bne @go
         rts
 @go:
+        lda #PAL_PTERO
+        sta blit_attr
         lda ptero_x_lo
         sta blit_x_lo
         lda ptero_x_hi
@@ -199,6 +208,8 @@ draw_ptero:
 
 ; ---------------------------------------------------------------------------
 draw_clouds:
+        lda #PAL_CLOUD
+        sta blit_attr
         ldx #0
         stx tmp+6
 @loop:
