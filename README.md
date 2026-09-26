@@ -61,13 +61,26 @@ Needs [cc65](https://cc65.github.io) and Lua.
 ```sh
 brew install cc65 lua      # or your package manager's equivalent
 make                       # -> build/dino.nes
-make run                   # build it and play it
+make run                   # build it and open MyNES
 make test                  # build it and check it still works
 ```
 
-`make run` and `make test` use [MyNES](https://github.com/dimiro1/mynes),
-which the build finds by itself: `$MYNES` if you set it, otherwise one lying
-about near the project, otherwise it asks, otherwise it downloads a release.
+Builds include debug symbols: `build/dino.dbg` contains source-level debug
+information, and `build/dino.labels` contains VICE labels. `make debug`
+generates matching files for each test variant alongside its ROM.
+
+`make run` checks for the latest [MyNES](https://github.com/dimiro1/mynes)
+release on every invocation and downloads it only if that release is not
+already cached. It uses this managed release rather than `$MYNES`.
+It requires internet access, curl, unzip, and Java to launch the emulator.
+Downloaded releases are kept in `tools/.mynes/`.
+
+`make test` uses `$MYNES` if set, otherwise the remembered download or a nearby
+copy, otherwise it asks, otherwise it downloads a release.
+
+MyNES opens its window without command-line arguments. After `make run`,
+choose **File > Open...** and select `build/dino.nes`; the command prints
+its full path.
 
 ## The artwork
 

@@ -9,6 +9,8 @@
 --    4. asked for, if there is a terminal to ask at
 --    5. downloaded from the project's own releases, checksum first
 --
+--  --update checks the latest release and downloads it only if not cached.
+--
 --  Nothing here knows any particular machine's layout, so a checkout works
 --  the same wherever it is put.
 -- ---------------------------------------------------------------------------
@@ -19,6 +21,7 @@ local HERE = (debug.getinfo(1, 'S').source:sub(2):match('^(.*)[/\\]') or '.')
 local ROOT = HERE .. '/..'
 local CACHE = HERE .. '/.mynes'
 local REMEMBERED = CACHE .. '/path'
+local RELEASE = CACHE .. '/release'
 local REPO = 'dimiro1/mynes'
 
 local function quote(s) return "'" .. s:gsub("'", "'\\''") .. "'" end
@@ -99,18 +102,25 @@ local function download()
     end
     os.execute('mkdir -p ' .. quote(CACHE))
 
-    io.stderr:write('Fetching the latest MyNES release from github.com/', REPO, ' ...\n')
+    io.stderr:write('Checking the latest MyNES release from github.com/', REPO, ' ...\n')
     local api = 'https://api.github.com/repos/' .. REPO .. '/releases/latest'
     local release = capture('curl -fsSL --max-time 60 ' .. quote(api))
     if not release or release == '' then
-        error('could not reach the GitHub API; set MYNES to a jar instead')
+        error('could not reach the GitHub API; try again when connected')
     end
 
     local zip_url = release:match('"browser_download_url"%s*:%s*"(https://[^"]-%.zip)"')
     local sums_url = release:match('"browser_download_url"%s*:%s*"(https://[^"]-SHA256SUMS)"')
     local tag = release:match('"tag_name"%s*:%s*"([^"]+)"') or '?'
     if not zip_url then
-        error('the latest release has no zip in it; set MYNES to a jar instead')
+        error('the latest release has no zip in it')
+    end
+
+    local saved_tag, saved_url, saved_jar = (read_file(RELEASE) or ''):match(
+        '^([^\n]+)\n([^\n]+)\n([^\n]+)\n$')
+    if saved_tag == tag and saved_url == zip_url and exists(saved_jar) then
+        io.stderr:write('  ', tag, ' is already downloaded\n')
+        return saved_jar
     end
 
     local name = zip_url:match('([^/]+)$')
@@ -137,13 +147,21 @@ local function download()
         end
     end
 
-    if not os.execute('unzip -q -o ' .. quote(zip) .. ' -d ' .. quote(CACHE)) then
+    -- Extract into a fresh directory so an older cached jar cannot be selected.
+    local unpack = first_line(capture('mktemp -d ' .. quote(CACHE .. '/release.XXXXXX')))
+    if not unpack then error('could not create a release directory') end
+    if not os.execute('unzip -q -o ' .. quote(zip) .. ' -d ' .. quote(unpack)) then
         error('unzipping ' .. zip .. ' failed')
     end
     os.remove(zip)
 
-    local jar = first_line(capture('find ' .. quote(CACHE) .. ' -name mynes.jar -type f'))
+    local jar = first_line(capture('find ' .. quote(unpack) .. ' -name mynes.jar -type f'))
     if not jar then error('no mynes.jar inside ' .. name) end
+    jar = absolute(jar)
+    local metadata = assert(io.open(RELEASE .. '.tmp', 'w'))
+    assert(metadata:write(tag, '\n', zip_url, '\n', jar, '\n'))
+    assert(metadata:close())
+    assert(os.rename(RELEASE .. '.tmp', RELEASE))
     io.stderr:write('  ready: ', jar, '\n\n')
     return jar
 end
@@ -167,7 +185,9 @@ end
 -- --- the one thing this module is for --------------------------------------
 
 --- Return a path to mynes.jar, finding, asking for or fetching one as needed.
-function M.jar()
+function M.jar(check_updates)
+    if check_updates then return remember(absolute(download())) end
+
     local fromenv = os.getenv('MYNES')
     if fromenv and fromenv ~= '' then
         if not exists(fromenv) then
@@ -190,7 +210,11 @@ end
 -- Run as a script rather than required, it prints the path it settled on --
 -- which is how the Makefile gets hold of one.
 if arg and arg[0] and arg[0]:match('mynes%.lua$') then
-    print(M.jar())
+    if #arg > 1 or (arg[1] and arg[1] ~= '--update') then
+        io.stderr:write('Usage: lua tools/mynes.lua [--update]\n')
+        os.exit(2)
+    end
+    print(M.jar(arg[1] == '--update'))
 end
 
 return M

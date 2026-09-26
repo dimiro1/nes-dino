@@ -1,11 +1,12 @@
 # ---------------------------------------------------------------------------
 #  make          build build/dino.nes
-#  make run      build it and play it
+#  make run      build it and open MyNES
 #  make test     build it and run the headless checks
 #  make art      rebuild the tiles and the preview sheets only
 #  make debug    build the three test-only variants
 #
-#  Needs cc65 (ca65 and ld65) and Lua.  The emulator is found on its own:
+#  Needs cc65 (ca65 and ld65) and Lua.  run checks for MyNES updates;
+#  test finds the emulator on its own:
 #  $MYNES if you set it, else one lying about near the project, else it asks,
 #  else it fetches a release.  See tools/mynes.lua.
 # ---------------------------------------------------------------------------
@@ -25,13 +26,15 @@ $(CHR) $(TILEINC): $(ART) tools/mktiles.lua tools/png.lua
 build/dino.o: src/main.s $(SOURCES) $(CHR) $(TILEINC)
 	ca65 -g -o $@ -I src --create-dep build/dino.d src/main.s
 
-$(ROM): build/dino.o src/dino.cfg
-	ld65 -C src/dino.cfg -o $@ -Ln build/dino.labels build/dino.o
+$(ROM): build/dino.o src/dino.cfg Makefile
+	ld65 -C src/dino.cfg -o $@ -Ln build/dino.labels --dbgfile build/dino.dbg build/dino.o
 
 art: $(CHR)
 
 run: $(ROM)
-	java -jar "$$($(LUA) tools/mynes.lua)" $(ROM)
+	@jar="$$($(LUA) tools/mynes.lua --update)" || exit $$?; \
+	printf 'In MyNES, choose File > Open... and select %s\n' "$(abspath $(ROM))"; \
+	java -jar "$$jar"
 
 test: $(ROM) debug
 	$(LUA) tools/playtest.lua
@@ -42,20 +45,20 @@ test: $(ROM) debug
 # only a bird can end a run.  None of them is the game.
 debug: build/dino-fast.nes build/dino-god.nes build/dino-birds.nes
 
-build/dino-fast.nes: $(SOURCES) $(CHR) $(TILEINC)
+build/dino-fast.nes: $(SOURCES) $(CHR) $(TILEINC) src/dino.cfg Makefile
 	ca65 -g -D DEBUG_FAST=1 -o build/dino-fast.o -I src src/main.s
-	ld65 -C src/dino.cfg -o $@ -Ln build/dino-fast.labels build/dino-fast.o
+	ld65 -C src/dino.cfg -o $@ -Ln build/dino-fast.labels --dbgfile build/dino-fast.dbg build/dino-fast.o
 
-build/dino-god.nes: $(SOURCES) $(CHR) $(TILEINC)
+build/dino-god.nes: $(SOURCES) $(CHR) $(TILEINC) src/dino.cfg Makefile
 	ca65 -g -D DEBUG_FAST=1 -D DEBUG_GODMODE=1 -o build/dino-god.o -I src src/main.s
-	ld65 -C src/dino.cfg -o $@ -Ln build/dino-god.labels build/dino-god.o
+	ld65 -C src/dino.cfg -o $@ -Ln build/dino-god.labels --dbgfile build/dino-god.dbg build/dino-god.o
 
-build/dino-birds.nes: $(SOURCES) $(CHR) $(TILEINC)
+build/dino-birds.nes: $(SOURCES) $(CHR) $(TILEINC) src/dino.cfg Makefile
 	ca65 -g -D DEBUG_FAST=1 -D DEBUG_NOCACTUS=1 -o build/dino-birds.o -I src src/main.s
-	ld65 -C src/dino.cfg -o $@ -Ln build/dino-birds.labels build/dino-birds.o
+	ld65 -C src/dino.cfg -o $@ -Ln build/dino-birds.labels --dbgfile build/dino-birds.dbg build/dino-birds.o
 
 clean:
-	rm -rf build/*.o build/*.nes build/*.d build/*.labels build/*.chr \
+	rm -rf build/*.o build/*.nes build/*.d build/*.labels build/*.dbg build/*.chr \
 	       build/tiles.inc build/test build/dbg build/shots
 
 .PHONY: all run test art debug clean
